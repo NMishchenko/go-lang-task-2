@@ -41,7 +41,15 @@ func StartProcessing(scanner *bufio.Scanner) string {
 			break
 		}
 
+		if n != len(row) {
+			log.Fatalf("Row has %d columns, but must have %d\n", len(row), n)
+		}
+
 		table = append(table, row)
+	}
+
+	if scanner.Err() != nil {
+		log.Fatal(scanner.Err())
 	}
 
 	sort.Slice(table, func(i, j int) bool {
