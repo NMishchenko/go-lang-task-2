@@ -15,7 +15,9 @@ func main() {
 	var content string
 	content = ReadFromConsole()
 
-	fmt.Println("Sorted data:\n" + content)
+	if content != "" {
+		fmt.Println("Sorted data:\n" + content)
+	}
 }
 
 func ReadFromConsole() string {
@@ -30,6 +32,14 @@ func StartProcessing(scanner *bufio.Scanner) string {
 	for scanner.Scan() {
 		line := scanner.Text()
 		row := strings.Split(line, ",")
+
+		if n == 0 {
+			n = len(row)
+		}
+
+		if line == "" {
+			break
+		}
 
 		table = append(table, row)
 	}
