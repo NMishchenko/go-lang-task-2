@@ -7,6 +7,8 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
+	"strconv"
 )
 
 const sortingFieldIndex = 0
@@ -17,6 +19,10 @@ func main() {
 
 	if content != "" {
 		fmt.Println("Sorted data:\n" + content)
+
+		dateTimeNow := time.Now()
+		fileName := strconv.Itoa(dateTimeNow.Year()) + "-" + dateTimeNow.Month().String() + "-" + strconv.Itoa(dateTimeNow.Day()) + "_" + strconv.Itoa(dateTimeNow.Hour()) + "-" + strconv.Itoa(dateTimeNow.Minute()) + "-" + strconv.Itoa(dateTimeNow.Second()) + ".csv"
+		WriteToFile(content, fileName)
 	}
 }
 
@@ -64,4 +70,21 @@ func StartProcessing(scanner *bufio.Scanner) string {
 	}
 
 	return result.String()
+}
+
+func WriteToFile(content, fileName string) {
+	if fileName != "" {
+		file, err := os.Create(fileName)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		defer file.Close()
+		_, err = file.WriteString(content)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 }
