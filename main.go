@@ -9,29 +9,58 @@ import (
 	"strings"
 	"time"
 	"strconv"
+	"flag"
 )
 
-const sortingFieldIndex = 0
-
 func main() {
+	inputFileName := flag.String("i", "", "Use a file with the name file-name as an input.")
+	outputFileName := flag.String("o", "", "Use a file with the name file-name as an output.")
+	sortingFilesIndex := flag.Int("f", 0, "Sort input lines by value number N.")
+	isNotIgnoreHeader := flag.Bool("h", false, "The first line is a header that must be ignored during sorting but included in the output.")
+	isReversedOrder := flag.Bool("r", false, "Sort input lines in reverse order.")
+	flag.Parse()
+	
 	var content string
-	content = ReadFromConsole()
+	if *inputFileName == "" {
+		content = ReadFromConsole(*sortingFilesIndex, *isReversedOrder, *isNotIgnoreHeader)
+	} else {
+		content = ReadFromFile(*sortingFilesIndex, *isReversedOrder, *isNotIgnoreHeader, *inputFileName)
+	}
 
 	if content != "" {
 		fmt.Println("Sorted data:\n" + content)
 
-		dateTimeNow := time.Now()
-		fileName := strconv.Itoa(dateTimeNow.Year()) + "-" + dateTimeNow.Month().String() + "-" + strconv.Itoa(dateTimeNow.Day()) + "_" + strconv.Itoa(dateTimeNow.Hour()) + "-" + strconv.Itoa(dateTimeNow.Minute()) + "-" + strconv.Itoa(dateTimeNow.Second()) + ".csv"
-		WriteToFile(content, fileName)
+		if *outputFileName == "" {
+			dateTimeNow := time.Now()
+			*outputFileName = strconv.Itoa(dateTimeNow.Year()) + "-" + dateTimeNow.Month().String() + "-" + strconv.Itoa(dateTimeNow.Day()) + "_" + strconv.Itoa(dateTimeNow.Hour()) + "-" + strconv.Itoa(dateTimeNow.Minute()) + "-" + strconv.Itoa(dateTimeNow.Second()) + ".csv"
+		}
+
+		WriteToFile(content, *outputFileName)
 	}
 }
 
-func ReadFromConsole() string {
+func ReadFromConsole(sortingFieldIndex int, isReversedOrder, isNotIgnoreHeader bool) string {
 	scanner := bufio.NewScanner(os.Stdin)
-	return StartProcessing(scanner)
+	return StartProcessing(sortingFieldIndex, isReversedOrder, isNotIgnoreHeader, scanner)
 }
 
-func StartProcessing(scanner *bufio.Scanner) string {
+func ReadFromFile(sortingFieldIndex int, isReversedOrder, isNotIgnoreHeader bool, inputFile string) string {
+	file, err := os.Open(inputFile)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer file.Close()
+	fileScanner := bufio.NewScanner(file)
+	fileScanner.Split(bufio.ScanLines)
+
+	content := StartProcessing(sortingFieldIndex, isReversedOrder, isNotIgnoreHeader, fileScanner)
+	return content
+}
+
+func StartProcessing(sortingFieldIndex int, isReversedOrder, isNotIgnoreHeader bool, scanner *bufio.Scanner) string {
+	var header string
 	n := 0
 	table := [][]string{}
 
@@ -41,6 +70,10 @@ func StartProcessing(scanner *bufio.Scanner) string {
 
 		if n == 0 {
 			n = len(row)
+			if isNotIgnoreHeader {
+				header = line
+				continue
+			}
 		}
 
 		if line == "" {
@@ -59,10 +92,15 @@ func StartProcessing(scanner *bufio.Scanner) string {
 	}
 
 	sort.Slice(table, func(i, j int) bool {
-		return table[i][sortingFieldIndex] < table[j][sortingFieldIndex]
+		return Compare(table[i][sortingFieldIndex], table[j][sortingFieldIndex], isReversedOrder)
 	})
 
 	var result strings.Builder
+
+	if header != "" {
+		result.WriteString(header)
+		result.WriteString("\n")
+	}
 
 	for _, row := range table {
 		result.WriteString(strings.Join(row, ","))
@@ -87,4 +125,8 @@ func WriteToFile(content, fileName string) {
 			log.Fatal(err)
 		}
 	}
+}
+
+func Compare(first, next string, isReversed bool) bool {
+	return first < next != isReversed
 }
