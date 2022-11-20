@@ -10,6 +10,7 @@ import (
 	"time"
 	"strconv"
 	"flag"
+	"path/filepath"
 )
 
 func main() {
@@ -18,14 +19,17 @@ func main() {
 	sortingFilesIndex := flag.Int("f", 0, "Sort input lines by value number N.")
 	isNotIgnoreHeader := flag.Bool("h", false, "The first line is a header that must be ignored during sorting but included in the output.")
 	isReversedOrder := flag.Bool("r", false, "Sort input lines in reverse order.")
+	inputDirectory := flag.String("d", "", "Specify a directory where the application must read input files from.")
 	flag.Parse()
-	
-	var content string
-	if *inputFileName == "" {
-		content = ReadFromConsole(*sortingFilesIndex, *isReversedOrder, *isNotIgnoreHeader)
-	} else {
-		content = ReadFromFile(*sortingFilesIndex, *isReversedOrder, *isNotIgnoreHeader, *inputFileName)
+
+	if *inputFileName != "" && *inputDirectory != "" {
+		fmt.Println("You can use only one of these flags: -i/-d")
+		return
 	}
+
+	var content string
+
+	content = Sort(ReadFile(ReadDirectory(content, *isNotIgnoreHeader, *inputDirectory), *isNotIgnoreHeader, *inputFileName), *sortingFilesIndex, *isReversedOrder)
 
 	if content != "" {
 		fmt.Println("Sorted data:\n" + content)
@@ -39,12 +43,45 @@ func main() {
 	}
 }
 
-func ReadFromConsole(sortingFieldIndex int, isReversedOrder, isNotIgnoreHeader bool) string {
-	scanner := bufio.NewScanner(os.Stdin)
-	return StartProcessing(sortingFieldIndex, isReversedOrder, isNotIgnoreHeader, scanner)
+func ReadDirectory(content string, isNotIgnoreHeader bool, inputDirectory string) string {
+	if inputDirectory != "" {
+		err := filepath.Walk(inputDirectory,
+			func(path string, info os.FileInfo, err error) error {
+				if err != nil {
+					return err
+				}
+
+				if strings.HasSuffix(path, ".csv") {
+					content = content + ReadFromFile(isNotIgnoreHeader, path)
+				}
+				
+				return nil
+			})
+
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+
+	return content
 }
 
-func ReadFromFile(sortingFieldIndex int, isReversedOrder, isNotIgnoreHeader bool, inputFile string) string {
+func ReadFile(content string, isNotIgnoreHeader bool, inputFileName string) string {
+	if inputFileName == "" {
+		content = content + ReadFromConsole(isNotIgnoreHeader)
+	} else {
+		content = content + ReadFromFile(isNotIgnoreHeader, inputFileName)
+	}
+
+	return content
+}
+
+func ReadFromConsole(isNotIgnoreHeader bool) string {
+	scanner := bufio.NewScanner(os.Stdin)
+	return StartProcessing(isNotIgnoreHeader, scanner)
+}
+
+func ReadFromFile(isNotIgnoreHeader bool, inputFile string) string {
 	file, err := os.Open(inputFile)
 
 	if err != nil {
@@ -55,11 +92,11 @@ func ReadFromFile(sortingFieldIndex int, isReversedOrder, isNotIgnoreHeader bool
 	fileScanner := bufio.NewScanner(file)
 	fileScanner.Split(bufio.ScanLines)
 
-	content := StartProcessing(sortingFieldIndex, isReversedOrder, isNotIgnoreHeader, fileScanner)
+	content := StartProcessing(isNotIgnoreHeader, fileScanner)
 	return content
 }
 
-func StartProcessing(sortingFieldIndex int, isReversedOrder, isNotIgnoreHeader bool, scanner *bufio.Scanner) string {
+func StartProcessing(isNotIgnoreHeader bool, scanner *bufio.Scanner) string {
 	var header string
 	n := 0
 	table := [][]string{}
@@ -91,10 +128,6 @@ func StartProcessing(sortingFieldIndex int, isReversedOrder, isNotIgnoreHeader b
 		log.Fatal(scanner.Err())
 	}
 
-	sort.Slice(table, func(i, j int) bool {
-		return Compare(table[i][sortingFieldIndex], table[j][sortingFieldIndex], isReversedOrder)
-	})
-
 	var result strings.Builder
 
 	if header != "" {
@@ -102,6 +135,30 @@ func StartProcessing(sortingFieldIndex int, isReversedOrder, isNotIgnoreHeader b
 		result.WriteString("\n")
 	}
 
+	for _, row := range table {
+		result.WriteString(strings.Join(row, ","))
+		result.WriteString("\n")
+	}
+
+	return result.String()
+}
+
+func Sort(content string, sortingFieldIndex int, isReversedOrder bool) string {
+	table := [][]string{}
+
+	rows := strings.Split(content, "\n")
+
+	for i := 0; i < len(rows); i++ {
+		cols := strings.Split(rows[i], ",")
+		table = append(table, cols)
+	}
+
+	sort.Slice(table, func(i, j int) bool {
+		return Compare(table[i][sortingFieldIndex], table[j][sortingFieldIndex], isReversedOrder)
+	})
+
+	var result strings.Builder
+	
 	for _, row := range table {
 		result.WriteString(strings.Join(row, ","))
 		result.WriteString("\n")
